@@ -20,13 +20,15 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def entry_page():
     st.title('Access Code')
     user_code = st.text_input("Enter your access code:")
+    user_email = st.text_input("Enter your BYUH email:")
     if st.button("Submit"):
-        if user_code == ACCESS_CODE:
+        if user_code == ACCESS_CODE and (user_email.endswith('@go.byuh.edu') or user_email.endswith('byuh.edu')):
             st.success("Access granted.")
             st.session_state['access_granted'] = True
+            st.session_state['user_email'] = user_email
             st.rerun()
         else:
-            st.error("Invalid access code. Please try again.")
+            st.error("Invalid access code or email. Please try again.")
 
 def libraryBot_page():
     if 'session_id' not in st.session_state:
@@ -37,6 +39,8 @@ def libraryBot_page():
         hawaii = pytz.timezone('Pacific/Honolulu')
         st.session_state['session_start_time'] = datetime.now(hawaii)
     session_start_time = st.session_state['session_start_time']
+
+    user_email = st.session_state.get('user_email', '')
 
     @st.cache_data()
     def initialize_firebase():
@@ -82,6 +86,7 @@ def libraryBot_page():
         if not session_ref.get():
             session_ref.set({
             'start_time': session_start_time.strftime("%m/%d/%Y, %H:%M:%S"),
+            'user_email:' : user_email,
             'outputs': []
         })
 
