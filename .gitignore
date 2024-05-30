@@ -1,5 +1,6 @@
 .streamlit/
 testTempBot.py
-venv/
 
+venv/
 .env
+student_emails.json

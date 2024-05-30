@@ -22,13 +22,27 @@ def entry_page():
     user_code = st.text_input("Enter your access code:")
     user_email = st.text_input("Enter your BYUH email:")
     if st.button("Submit"):
-        if user_code == ACCESS_CODE and (user_email.endswith('@go.byuh.edu') or user_email.endswith('byuh.edu')):
-            st.success("Access granted.")
-            st.session_state['access_granted'] = True
-            st.session_state['user_email'] = user_email
-            st.rerun()
+        if user_code == ACCESS_CODE :
+
+            if not firebase_admin._apps:
+                cred = credentials.Certificate(json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"]))
+                firebase_admin.initialize_app(cred, { 'databaseURL' : 'https://chatstore-history-default-rtdb.firebaseio.com/'})
+
+            temp_modified_email = user_email.replace('.', ',')    
+
+            ref = db.reference('student_emails')
+            student_emails = ref.get()
+
+            if student_emails and temp_modified_email in student_emails:
+
+                st.success("Access granted.")
+                st.session_state['access_granted'] = True
+                st.session_state['user_email'] = user_email
+                st.rerun()
+            else:
+                st.error("Invalid email. Please try again.")
         else:
-            st.error("Invalid access code or email. Please try again.")
+            st.error("invalid access code please try again")
 
 def libraryBot_page():
     if 'session_id' not in st.session_state:
@@ -42,12 +56,12 @@ def libraryBot_page():
 
     user_email = st.session_state.get('user_email', '')
 
-    @st.cache_data()
-    def initialize_firebase():
-        cred = credentials.Certificate(json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"]))
-        firebase_admin.initialize_app(cred, { 'databaseURL' : 'https://chatstore-history-default-rtdb.firebaseio.com/'})
+    # @st.cache_data()
+    # def initialize_firebase():
+    #     cred = credentials.Certificate(json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"]))
+    #     firebase_admin.initialize_app(cred, { 'databaseURL' : 'https://chatstore-history-default-rtdb.firebaseio.com/'})
 
-    initialize_firebase()
+    # initialize_firebase()
 
     def record_output(role, output):
         reference = session_ref.child('outputs')
