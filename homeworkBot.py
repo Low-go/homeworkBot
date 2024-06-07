@@ -19,28 +19,27 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def entry_page():
     st.title('Access Code')
-    user_code = st.text_input("Enter your access code:")
-    user_email = st.text_input("Enter your BYUH email:")
+    user_code = st.text_input("Enter your access code:", type='password')
+    student_username = st.text_input("Enter your BYUH student username:")
     if st.button("Submit"):
         if user_code == ACCESS_CODE :
 
             if not firebase_admin._apps:
                 cred = credentials.Certificate(json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"]))
                 firebase_admin.initialize_app(cred, { 'databaseURL' : 'https://chatstore-history-default-rtdb.firebaseio.com/'})
+  
 
-            temp_modified_email = user_email.replace('.', ',')    
+            ref = db.reference('student_usernames')
+            student_usernames_list = ref.get()
 
-            ref = db.reference('student_emails')
-            student_emails = ref.get()
-
-            if student_emails and temp_modified_email in student_emails:
+            if student_username in student_usernames_list:
 
                 st.success("Access granted.")
                 st.session_state['access_granted'] = True
-                st.session_state['user_email'] = user_email
+                st.session_state['student_username'] = student_username
                 st.rerun()
             else:
-                st.error("Invalid email. Please try again.")
+                st.error("Invalid student username. Please try again.")
         else:
             st.error("invalid access code please try again")
 
@@ -54,7 +53,7 @@ def libraryBot_page():
         st.session_state['session_start_time'] = datetime.now(hawaii)
     session_start_time = st.session_state['session_start_time']
 
-    user_email = st.session_state.get('user_email', '')
+    student_username = st.session_state.get('student_username', '')
 
     # @st.cache_data()
     # def initialize_firebase():
@@ -100,7 +99,7 @@ def libraryBot_page():
         if not session_ref.get():
             session_ref.set({
             'start_time': session_start_time.strftime("%m/%d/%Y, %H:%M:%S"),
-            'user_email:' : user_email,
+            'student_username:' : student_username,
             'outputs': []
         })
 

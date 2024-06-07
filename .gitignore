@@ -3,4 +3,4 @@ testTempBot.py
 
 venv/
 .env
-student_emails.json
+student_usernames.json
