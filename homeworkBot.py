@@ -10,6 +10,7 @@ from datetime import datetime
 import uuid
 import pytz
 from openai import OpenAI
+import time
 
 
 load_dotenv()
@@ -43,7 +44,7 @@ def entry_page():
         else:
             st.error("invalid access code please try again")
 
-def libraryBot_page():
+def libraryBot_page(): 
     if 'session_id' not in st.session_state:
         st.session_state['session_id'] = str(uuid.uuid4())[:8]
     session_id = st.session_state['session_id']
@@ -52,6 +53,7 @@ def libraryBot_page():
         hawaii = pytz.timezone('Pacific/Honolulu')
         st.session_state['session_start_time'] = datetime.now(hawaii)
     session_start_time = st.session_state['session_start_time']
+    initial_time = time.time()   #will be used to get session length
 
     student_username = st.session_state.get('student_username', '')
 
@@ -126,6 +128,9 @@ def libraryBot_page():
                         res_box.markdown(f'<div style="border:2px solid lightgreen; padding:10px; margin:5px; border-radius: 15px;"><b>Current Output: </b>{result}</div>', unsafe_allow_html=True)
 
         st.session_state['chat_display'].append({"role": "assistant", "content": result})
+        session_end_time = time.time()
+        session_length = session_end_time - session_start_time 
+        ref.child('session_id').set({'session_length' : session_length})
         record_output('assistant', result)
 
 if 'access_granted' not in st.session_state:
