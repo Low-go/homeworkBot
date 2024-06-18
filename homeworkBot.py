@@ -11,7 +11,7 @@ import uuid
 import pytz
 from openai import OpenAI
 import time
-
+import math
 
 load_dotenv()
 ACCESS_CODE = os.getenv("ACCESS_CODE")
@@ -23,18 +23,16 @@ def entry_page():
     user_code = st.text_input("Enter your access code:", type='password')
     student_username = st.text_input("Enter your BYUH student username:")
     if st.button("Submit"):
-        if user_code == ACCESS_CODE :
+        if user_code == ACCESS_CODE:
 
             if not firebase_admin._apps:
                 cred = credentials.Certificate(json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"]))
-                firebase_admin.initialize_app(cred, { 'databaseURL' : 'https://chatstore-history-default-rtdb.firebaseio.com/'})
-  
+                firebase_admin.initialize_app(cred, {'databaseURL': 'https://chatstore-history-default-rtdb.firebaseio.com/'})
 
             ref = db.reference('student_usernames')
             student_usernames_list = ref.get()
 
             if student_username in student_usernames_list:
-
                 st.success("Access granted.")
                 st.session_state['access_granted'] = True
                 st.session_state['student_username'] = student_username
@@ -53,22 +51,15 @@ def libraryBot_page():
         hawaii = pytz.timezone('Pacific/Honolulu')
         st.session_state['session_start_time'] = datetime.now(hawaii)
     session_start_time = st.session_state['session_start_time']
-    initial_time = time.time()   #will be used to get session length
+    initial_time = time.time()   # Will be used to get session length
 
     student_username = st.session_state.get('student_username', '')
-
-    # @st.cache_data()
-    # def initialize_firebase():
-    #     cred = credentials.Certificate(json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"]))
-    #     firebase_admin.initialize_app(cred, { 'databaseURL' : 'https://chatstore-history-default-rtdb.firebaseio.com/'})
-
-    # initialize_firebase()
 
     def record_output(role, output):
         reference = session_ref.child('outputs')
         output_data = {
-            'role' : role,
-            'content' : output,   
+            'role': role,
+            'content': output,   
         }
         reference.push(output_data)
 
@@ -95,15 +86,14 @@ def libraryBot_page():
     if user_input:
         st.markdown("_____")
         
-
         ref = db.reference('sessions')
         session_ref = ref.child(session_id)
         if not session_ref.get():
             session_ref.set({
-            'start_time': session_start_time.strftime("%m/%d/%Y, %H:%M:%S"),
-            'student_username:' : student_username,
-            'outputs': []
-        })
+                'start_time': session_start_time.strftime("%m/%d/%Y, %H:%M:%S"),
+                'student_username': student_username,
+                'outputs': []
+            })
 
         st.session_state['chat_display'].append({"role": "user", "content": user_input})
         record_output('user', user_input)
@@ -111,27 +101,33 @@ def libraryBot_page():
         report = []
 
         stream = client.beta.threads.create_and_run(
-            assistant_id = assistant_id,
-            thread={
-                "messages": history
-            },
-            stream = True
+            assistant_id=assistant_id,
+            thread={"messages": history},
+            stream=True
         )
 
         for event in stream:
             if event.data.object == "thread.message.delta":
                 for content in event.data.delta.content:
                     if content.type == "text":
-
                         report.append(content.text.value)
                         result = "".join(report).strip()
                         res_box.markdown(f'<div style="border:2px solid lightgreen; padding:10px; margin:5px; border-radius: 15px;"><b>Current Output: </b>{result}</div>', unsafe_allow_html=True)
 
         st.session_state['chat_display'].append({"role": "assistant", "content": result})
+
         session_end_time = time.time()
-        session_length = session_end_time - session_start_time 
-        ref.child('session_id').set({'session_length' : session_length})
+        session_length_seconds = session_end_time - session_start_time.timestamp()  # Convert seconds to minutes
+        session_length_minutes = math.floor(session_length_seconds / 60)
+
+        if session_length_minutes < 1:
+            session_length = "under a minute"
+        else:
+            session_length = session_length_minutes
+
+        ref.child(session_id).update({'session_length': session_length})
         record_output('assistant', result)
+
 
 if 'access_granted' not in st.session_state:
     st.session_state['access_granted'] = False
