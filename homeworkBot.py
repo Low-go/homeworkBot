@@ -51,11 +51,12 @@ def libraryBot_page():
         hawaii = pytz.timezone('Pacific/Honolulu')
         st.session_state['session_start_time'] = datetime.now(hawaii)
     session_start_time = st.session_state['session_start_time']
-    initial_time = time.time()   # Will be used to get session length
 
     student_username = st.session_state.get('student_username', '')
 
     def record_output(role, output):
+        ref = db.reference('sessions')
+        session_ref = ref.child(session_id)
         reference = session_ref.child('outputs')
         output_data = {
             'role': role,
@@ -83,51 +84,55 @@ def libraryBot_page():
     history.extend(st.session_state['chat_display'])
     history.append({"role": "user", "content": user_input})
 
-    if user_input:
-        st.markdown("_____")
-        
-        ref = db.reference('sessions')
-        session_ref = ref.child(session_id)
-        if not session_ref.get():
-            session_ref.set({
-                'start_time': session_start_time.strftime("%m/%d/%Y, %H:%M:%S"),
-                'student_username': student_username,
-                'outputs': []
-            })
+    def handle_enter_key():
+        if user_input:
+            st.markdown("_____")
 
-        st.session_state['chat_display'].append({"role": "user", "content": user_input})
-        record_output('user', user_input)
+            ref = db.reference('sessions')
+            session_ref = ref.child(session_id)
+            if not session_ref.get():
+                session_ref.set({
+                    'start_time': session_start_time.strftime("%m/%d/%Y, %H:%M:%S"),
+                    'student_username': student_username,
+                    'outputs': []
+                })
 
-        report = []
+            st.session_state['chat_display'].append({"role": "user", "content": user_input})
+            record_output('user', user_input)
 
-        stream = client.beta.threads.create_and_run(
-            assistant_id=assistant_id,
-            thread={"messages": history},
-            stream=True
-        )
+            report = []
 
-        for event in stream:
-            if event.data.object == "thread.message.delta":
-                for content in event.data.delta.content:
-                    if content.type == "text":
-                        report.append(content.text.value)
-                        result = "".join(report).strip()
-                        res_box.markdown(f'<div style="border:2px solid lightgreen; padding:10px; margin:5px; border-radius: 15px;"><b>Current Output: </b>{result}</div>', unsafe_allow_html=True)
+            stream = client.beta.threads.create_and_run(
+                assistant_id=assistant_id,
+                thread={"messages": history},
+                stream=True
+            )
 
-        st.session_state['chat_display'].append({"role": "assistant", "content": result})
+            for event in stream:
+                if event.data.object == "thread.message.delta":
+                    for content in event.data.delta.content:
+                        if content.type == "text":
+                            report.append(content.text.value)
+                            result = "".join(report).strip()
+                            res_box.markdown(f'<div style="border:2px solid lightgreen; padding:10px; margin:5px; border-radius: 15px;"><b>Current Output: </b>{result}</div>', unsafe_allow_html=True)
 
-        session_end_time = time.time()
-        session_length_seconds = session_end_time - session_start_time.timestamp()  # Convert seconds to minutes
-        session_length_minutes = math.floor(session_length_seconds / 60)
+            st.session_state['chat_display'].append({"role": "assistant", "content": result})
 
-        if session_length_minutes < 1:
-            session_length = "under a minute"
-        else:
-            session_length = session_length_minutes
+            session_end_time = time.time()
+            session_length_seconds = session_end_time - session_start_time.timestamp()  # Convert seconds to minutes
+            session_length_minutes = math.floor(session_length_seconds / 60)
 
-        ref.child(session_id).update({'session_length': session_length})
-        record_output('assistant', result)
+            if session_length_minutes < 1:
+                session_length = "under a minute"
+            else:
+                session_length = session_length_minutes
 
+            ref.child(session_id).update({'session_length': session_length})
+            record_output('assistant', result)
+
+    # This will call handle_enter_key when Enter key is pressed
+    if st.button("Submit", key="submit_button", on_click=handle_enter_key):
+        pass
 
 if 'access_granted' not in st.session_state:
     st.session_state['access_granted'] = False
